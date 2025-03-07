@@ -1,0 +1,9 @@
+langchain
+langchain_ollama
+python-dotenv
+fastapi
+uvicorn
+pymysql
+sqlalchemy
+alembic
+sqlmodel
