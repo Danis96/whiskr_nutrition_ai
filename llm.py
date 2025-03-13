@@ -19,6 +19,7 @@ class PetNutritionLLM:
                     "[INST]",
                     "[/INST]"
                 ]
+
             )
         except requests.exceptions.ConnectionError:
             raise ConnectionError(
@@ -37,12 +38,13 @@ class PetNutritionLLM:
             "- **Activity Level:** {activity_level} (Low, Medium, High) \n"
             "- **Health Concerns:** {health_concerns} \n\n"
             "IMPORTANT CONSIDERATIONS:\n"
-            "1. Calculate calories based on species, weight, and activity level:\n"
-            "   CATS:\n"
+            "1. Calculate calories based on species, weight, and activity level.\n"
+            "   ONLY USE THE GUIDELINES FOR THE SPECIFIC SPECIES ({species}) OF THIS PET:\n\n"
+            "   CATS (ONLY USE IF PET IS A CAT):\n"
             "   - Indoor/Low Activity (3-6kg): 200-250 calories/day\n"
             "   - Outdoor/Medium Activity (3-6kg): 250-300 calories/day\n"
             "   - High Activity (3-6kg): 300-400 calories/day\n\n"
-            "   DOGS:\n"
+            "   DOGS (ONLY USE IF PET IS A DOG):\n"
             "   - Small Dogs (1-10kg):\n"
             "     * Low Activity: 200-400 calories/day\n"
             "     * Medium Activity: 400-600 calories/day\n"
@@ -88,6 +90,11 @@ class PetNutritionLLM:
             "7. Supplements must specify recommendations or 'No supplements required'\n"
             "8. Foods to avoid must list specific items or 'Standard diet is appropriate, avoid common harmful foods'\n"
             "9. Transition guidelines must explain how to implement the meal plan\n\n"
+            "IMPORTANT SPECIES-SPECIFIC INSTRUCTIONS:\n"
+            "1. This pet is a {species}. ONLY provide information relevant to {species}.\n"
+            "2. Do NOT mention dietary needs or considerations for any other species.\n"
+            "3. All recommendations must be specifically tailored for a {species}.\n"
+            "4. Never mention cats if this is a dog, and never mention dogs if this is a cat.\n\n"
             "Consider these factors for the meal plan:\n"
             "1. Age-appropriate portions and nutritional needs\n"
             "2. Activity level and energy requirements\n"
@@ -126,6 +133,12 @@ class PetNutritionLLM:
             "4. Ensures all nutritional requirements are met\n"
             "5. Provides specific portions and times based on established routine [/INST]\n"
         )
+        
+        self.existing_recipes_template: str = (
+            "[INST] The user already has the following recipe titles saved: {existing_recipes}. "
+            "Please ensure that your suggested recipes have DIFFERENT titles than these existing ones. "
+            "Create unique recipe names that do not duplicate any of the existing titles. [/INST]\n"
+        )
 
         self.closing_instructions: str = (
             "[INST] Provide a complete JSON response. Every field must be filled with meaningful content. "
@@ -150,14 +163,14 @@ class PetNutritionLLM:
             '    {{\n'
             '      "recipe_name": "REQUIRED: simple descriptive name for first recipe",\n'
             '      "ingredients": ["REQUIRED: only whole food ingredients"],\n'
-            '      "preparation": ["REQUIRED: simple cooking instructions"]\n'
-            '      "description": "REQUIRED: simple description of the recipe"\n'
+            '      "preparation": ["REQUIRED: simple cooking instructions"],\n'
+            '      "description": "REQUIRED: Write at least 2 complete sentences and no more than 4 sentences describing the recipe. Each recipe description MUST be at least 2 full sentences."\n'
             '    }},\n'
             '    {{\n'
             '      "recipe_name": "REQUIRED: simple descriptive name for second recipe",\n'
             '      "ingredients": ["REQUIRED: only whole food ingredients"],\n'
-            '      "preparation": ["REQUIRED: simple cooking instructions"]\n'
-            '      "description": "REQUIRED: simple description of the recipe"\n'
+            '      "preparation": ["REQUIRED: simple cooking instructions"],\n'
+            '      "description": "REQUIRED: Write at least 2 complete sentences and no more than 4 sentences describing the recipe. Each recipe description MUST be at least 2 full sentences."\n'
             '    }}\n'
             '  ],\n'
             '  "feeding_guidelines": {{\n'
@@ -172,7 +185,7 @@ class PetNutritionLLM:
             "}} [/INST]\n"
         )
 
-    def generate_meal_plan(self, pet_data: Dict, food_journal: Optional[List[Dict]] = None) -> Dict:
+    def generate_meal_plan(self, pet_data: Dict, food_journal: Optional[List[Dict]] = None, existing_recipes: Optional[List[str]] = None) -> Dict:
         try:
             # Initialize validator and validate pet data
             validator = PetDataValidator()
@@ -197,7 +210,12 @@ class PetNutritionLLM:
                 )
                 full_prompt += self.food_journal_template.format(food_journal=food_entries)
             else:
-                full_prompt += self.food_journal_template.format(food_journal=None)
+                full_prompt += self.food_journal_template.format(food_journal="No food journal provided")
+                
+            # Add existing recipes information if provided
+            if existing_recipes and len(existing_recipes) > 0:
+                existing_recipes_str: str = ", ".join([f'"{title}"' for title in existing_recipes])
+                full_prompt += self.existing_recipes_template.format(existing_recipes=existing_recipes_str)
 
             # Add final instructions
             full_prompt += self.closing_instructions

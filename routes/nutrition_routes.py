@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from typing import Dict
+from typing import Dict, List
 from llm import PetNutritionLLM
 
 router = APIRouter(
@@ -25,9 +25,13 @@ async def get_nutrition_plan(request_data: Dict):
             "health_concerns": request_data.get("health_concerns", "None"),
         }
 
+        # Extract existing recipe titles if provided
+        existing_recipes: List[str] = request_data.get("existing_recipes", [])
+
         response: Dict = nutrition_llm.generate_meal_plan(
             pet_data=pet_data,
-            food_journal=request_data.get("food_journal")
+            food_journal=request_data.get("food_journal"),
+            existing_recipes=existing_recipes
         )
 
         return response  
